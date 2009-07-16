@@ -1,0 +1,37 @@
+Name:                network-fancy
+Version:             0.1
+Synopsis:            Tidier network package.
+Description:         Tidier network package.
+License:             BSD3
+License-file:        COPYING
+Copyright:           Taru Karttunen <taruti@taruti.net>
+Author:              Taru Karttunen
+Category:            Network
+Maintainer:          taruti@taruti.net
+Cabal-Version:       >= 1.2
+Build-Type:          Simple
+
+Executable network-fancy-test
+    Main-Is:             test.hs
+    Other-Modules:       Network.Fancy
+    GHC-Options:         -fhpc
+    C-Sources:           cbits.c
+    Build-depends:	 base == 4.*, bytestring, random, directory
+    Extensions:          TypeSynonymInstances, ForeignFunctionInterface, CPP, 
+                         DeriveDataTypeable, FlexibleInstances, RankNTypes
+    if os(windows)
+      CPP-Options: -DWINDOWS=WINDOWS -DCALLCONV=stdcall
+    else
+      CPP-Options: -DCALLCONV=ccall
+
+Library
+    Build-Depends:       base == 4.*, bytestring
+    Exposed-modules:     Network.Fancy
+    C-Sources:           cbits.c
+    Extensions:          TypeSynonymInstances, ForeignFunctionInterface, CPP, 
+                         DeriveDataTypeable, FlexibleInstances, RankNTypes
+    GHC-Options:         -Wall
+    if os(windows)
+      CPP-Options: -DWINDOWS=WINDOWS -DCALLCONV=stdcall
+    else
+      CPP-Options: -DCALLCONV=ccall
