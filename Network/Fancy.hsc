@@ -274,7 +274,7 @@ throwGAIErrorIf comp = do
 
 -- Don't use gai_strerror with winsock - it is not thread-safe there.
 gaiError :: CInt -> IO String
-#if WINDOWS
+#ifdef WINDOWS
 
 gaiError (#const EAI_AGAIN)    = return "Temporary failure in name resolution."
 gaiError (#const EAI_BADFLAGS) = return "Invalid value for ai_flags."
@@ -437,7 +437,11 @@ rnumeric (SA sa len) = do
 #endif
       | otherwise   -> do fail "Unsupported address family!"
 
-foreign import CALLCONV unsafe inet_ntop :: CFamily -> Ptr a -> CString -> (SLen) -> IO CString
+#ifdef WINDOWS
+foreign import CALLCONV unsafe "InetNtop" inet_ntop :: CFamily -> Ptr a -> CString -> SLen -> IO CString
+#else
+foreign import CALLCONV unsafe inet_ntop :: CFamily -> Ptr a -> CString -> SLen -> IO CString
+#endof
 foreign import CALLCONV unsafe ntohs :: Word16 -> IO Word16
 
 
