@@ -1,5 +1,15 @@
+#ifndef WINDOWS
+#include <arpa/inet.h>
 #include <errno.h>
+#include <netdb.h>
 #include <sys/socket.h>
+#include <sys/un.h>
+#else
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#define sa_family_t short
+#define AI_NUMERICSERV 0
+#endif
 
 int getSocketError(void) { return errno; }
 
@@ -9,27 +19,3 @@ int getsockopt_error(int fd) {
   res = getsockopt(fd, SOL_SOCKET, SO_ERROR, &estat, &len);
   return (res == 0) ? estat : errno;
 }
-
-/*
-#if IMPL == EPOLL
-
-#include <sys/epoll.h>
-
-int EPollCtl(int efd, int fd, void *sptr) {
-  struct epoll_event ev;
-  ev.events = EPOLLERR | EPOLLHUP | EPOLLOUT | EPOLLIN | EPOLLET;
-  ev.data.ptr = sptr;
-  return epoll_ctl(efd, EPOLL_CTL_ADD, fd, &ev);
-}
-
-int EPollGetEvents(struct epoll_event *ev, int n) {
-  return ev[n].events;
-}
-
-void* EPollGetPtr(struct epoll_event *ev, int n) {
-  return ev[n].data.ptr;
-}
-
-
-#endif
-*/

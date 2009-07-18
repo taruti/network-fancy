@@ -21,9 +21,11 @@ Executable network-fancy-test
                          DeriveDataTypeable, FlexibleInstances, RankNTypes
     if os(windows)
       CPP-Options:       -DWINDOWS=WINDOWS -DCALLCONV=stdcall
+      CC-Options:        -DWINDOWS=WINDOWS -DCALLCONV=stdcall
       Extra-Libraries:   ws2_32
     else
-      CPP-Options: -DCALLCONV=ccall
+      CPP-Options:       -DCALLCONV=ccall
+      CC-Options:        -DCALLCONV=ccall
 
 Library
     Build-Depends:       base == 4.*, bytestring
@@ -34,6 +36,8 @@ Library
     GHC-Options:         -Wall
     if os(windows)
       CPP-Options:       -DWINDOWS=WINDOWS -DCALLCONV=stdcall
+      CC-Options:        -DWINDOWS=WINDOWS -DCALLCONV=stdcall
       Extra-Libraries:   ws2_32
     else
       CPP-Options:       -DCALLCONV=ccall
+      CC-Options:        -DCALLCONV=ccall
