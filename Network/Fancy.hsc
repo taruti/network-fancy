@@ -21,9 +21,11 @@ import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Internal as B
 import qualified Data.ByteString.Unsafe as B
 import qualified Data.ByteString.Lazy  as L
-import Data.Typeable
+import Data.List(intercalate)
+import Data.Typeable(Typeable)
 import Foreign
 import Foreign.C
+import Numeric(showHex)
 import System.IO
 import System.IO.Unsafe(unsafeInterleaveIO)
 import GHC.Handle
@@ -420,15 +422,23 @@ dgramServer ss sfun = do
 rnumeric, rname :: SocketAddress -> IO Address
 rnumeric (SA sa len) = do
   f <- getFamily (SA sa len)
-  let ntop l a = allocaArray (fromIntegral l) $ \ptr -> do
-                 r <- throwErrnoIfNull "inet_ntop" $ inet_ntop f a ptr l
-                 peekCString r
   withForeignPtr sa $ \sa_ptr -> do
+  let v4fmt, v6fmt :: [Word8] -> String
+      v4fmt         = intercalate "." . map show
+      v6fmt xs      = if head xs == 0 then ':':':':v6map (dropWhile (==0) xs) else v6map xs
+      v6map         = intercalate ":" . units
+      units []      = []
+      units [x]     = [showHex x ""]
+      units (x:y:r) = dropWhile (=='0') (showHex x $ ldigit y) : units r
+      ldigit x      = case showHex x "" of
+                        [z] -> ['0',z]
+                        z   -> z
+
   case () of
-    _ | f == afInet -> do n <- ntop (#const INET_ADDRSTRLEN)  $ (#ptr struct sockaddr_in, sin_addr) sa_ptr
+    _ | f == afInet -> do n <- fmap v4fmt $ peekArray 4 $ (#ptr struct sockaddr_in, sin_addr) sa_ptr
                           p <- ntohs =<< (#peek struct sockaddr_in, sin_port) sa_ptr
                           return $ IPv4 n (fromIntegral p)
-      | f == afInet6-> do n <- ntop (#const INET6_ADDRSTRLEN) $ (#ptr struct sockaddr_in6, sin6_addr) sa_ptr
+      | f == afInet6-> do n <- fmap v6fmt $ peekArray 16 $ (#ptr struct sockaddr_in, sin_addr) sa_ptr
                           p <- ntohs =<< (#peek struct sockaddr_in6, sin6_port) sa_ptr
                           return $ IPv6 n (fromIntegral p)
 #ifndef WINDOWS
@@ -437,13 +447,7 @@ rnumeric (SA sa len) = do
 #endif
       | otherwise   -> do fail "Unsupported address family!"
 
-#ifdef WINDOWS
-foreign import CALLCONV unsafe "InetNtop" inet_ntop :: CFamily -> Ptr a -> CString -> SLen -> IO CString
-#else
-foreign import CALLCONV unsafe inet_ntop :: CFamily -> Ptr a -> CString -> SLen -> IO CString
-#endif
 foreign import CALLCONV unsafe ntohs :: Word16 -> IO Word16
-
 
 rname (SA sa len) = do
   f <- getFamily (SA sa len)
