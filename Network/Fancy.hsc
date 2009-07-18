@@ -33,11 +33,13 @@ import System.Posix.Internals hiding(c_close)
 import GHC.IO.Device
 #endif
 
+#ifndef WINDOWS
 #include <errno.h>
 #include <sys/socket.h>
 #include <netdb.h>
-#ifndef WINDOWS
 #include <sys/un.h>
+#else
+#include <winsock2.h>
 #endif
 
 type HostName = String

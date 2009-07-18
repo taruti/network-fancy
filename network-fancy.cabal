@@ -20,7 +20,8 @@ Executable network-fancy-test
     Extensions:          TypeSynonymInstances, ForeignFunctionInterface, CPP, 
                          DeriveDataTypeable, FlexibleInstances, RankNTypes
     if os(windows)
-      CPP-Options: -DWINDOWS=WINDOWS -DCALLCONV=stdcall
+      CPP-Options:       -DWINDOWS=WINDOWS -DCALLCONV=stdcall
+      Extra-Libraries:   ws2_32
     else
       CPP-Options: -DCALLCONV=ccall
 
@@ -32,6 +33,7 @@ Library
                          DeriveDataTypeable, FlexibleInstances, RankNTypes
     GHC-Options:         -Wall
     if os(windows)
-      CPP-Options: -DWINDOWS=WINDOWS -DCALLCONV=stdcall
+      CPP-Options:       -DWINDOWS=WINDOWS -DCALLCONV=stdcall
+      Extra-Libraries:   ws2_32
     else
-      CPP-Options: -DCALLCONV=ccall
+      CPP-Options:       -DCALLCONV=ccall
