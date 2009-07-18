@@ -441,7 +441,7 @@ rnumeric (SA sa len) = do
 foreign import CALLCONV unsafe "InetNtop" inet_ntop :: CFamily -> Ptr a -> CString -> SLen -> IO CString
 #else
 foreign import CALLCONV unsafe inet_ntop :: CFamily -> Ptr a -> CString -> SLen -> IO CString
-#endof
+#endif
 foreign import CALLCONV unsafe ntohs :: Word16 -> IO Word16
 
 
