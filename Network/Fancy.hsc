@@ -186,7 +186,14 @@ try' :: IO a -> IO (Either SomeException a)
 try' = E.try
 
 withResolverLock :: IO a -> IO a
+#ifdef WINDOWS
+withResolverLock c = resolverLock `seq` c
+{-# NOINLINE resolverLock #-}
+resolverLock = unsafePerformIO $ allocaBytes (#size struct WSAData) (wsaStartup 0x0002)
+foreign import stdcall safe "WSAStartup" wsaStartup :: Int -> Ptr a -> IO CInt
+#else
 withResolverLock x = x
+#endif
 
 data SocketAddress = SA !(ForeignPtr ()) !Int deriving(Show)
 type AddrInfoT     = Word8
@@ -207,7 +214,7 @@ a2sas t f (IP   hn p)        = getAddrInfo hn (show p) f afUnspec t
 a2sas t f (IPv4 hn p)        = getAddrInfo hn (show p) f afInet t
 a2sas t f (IPv6 hn p)        = getAddrInfo hn (show p) f afInet6 t
 #ifdef WINDOWS
-a2sas _ _ (Unix fp)          = fail "Unix sockets not supported on Windows"
+a2sas _ _ (Unix _)           = fail "Unix sockets not supported on Windows"
 #else
 a2sas _ _ (Unix fp)          = do let maxSize = ((#size struct sockaddr_un)-(#offset struct sockaddr_un, sun_path))
                                   when (length fp >= maxSize) $ fail "Too long address for Unix socket"
