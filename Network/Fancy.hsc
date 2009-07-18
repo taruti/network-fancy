@@ -42,6 +42,7 @@ import GHC.IO.Device
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #define sa_family_t short
+#define AI_NUMERICSERV 0
 #endif
 
 type HostName = String
