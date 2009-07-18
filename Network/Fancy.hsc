@@ -34,9 +34,10 @@ import GHC.IO.Device
 #endif
 
 #ifndef WINDOWS
+#include <arpa/inet.h>
 #include <errno.h>
-#include <sys/socket.h>
 #include <netdb.h>
+#include <sys/socket.h>
 #include <sys/un.h>
 #else
 #include <winsock2.h>
@@ -436,7 +437,6 @@ rnumeric (SA sa len) = do
 #endif
       | otherwise   -> do fail "Unsupported address family!"
 
-#include <arpa/inet.h>
 foreign import CALLCONV unsafe inet_ntop :: CFamily -> Ptr a -> CString -> (SLen) -> IO CString
 foreign import CALLCONV unsafe ntohs :: Word16 -> IO Word16
 
