@@ -57,3 +57,4 @@ tryE x = try x >>= eh
     where eh :: Either SomeException a -> IO ()
           eh (Left e) = print e
           eh _        = return ()
+

@@ -15,7 +15,7 @@ module Network.Fancy
     ) where
 
 import Control.Concurrent
-import Control.Exception as E
+import Control.Exception as E(bracket, finally, try, SomeException)
 import Control.Monad(when, forM)
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Internal as B
@@ -26,27 +26,19 @@ import Data.Typeable(Typeable)
 import Foreign
 import Foreign.C
 import Numeric(showHex)
-import System.IO
+import System.IO(Handle, hClose, IOMode(ReadWriteMode))
 import System.IO.Unsafe(unsafeInterleaveIO)
-import GHC.Handle
+import GHC.Handle(fdToHandle')
 #if __GLASGOW_HASKELL__ <= 610
 import System.Posix.Internals hiding(c_close)
 #else
 import GHC.IO.Device
 #endif
-
-#ifndef WINDOWS
-#include <arpa/inet.h>
-#include <errno.h>
-#include <netdb.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-#else
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#define sa_family_t short
-#define AI_NUMERICSERV 0
+#ifdef WINDOWS
+import GHC.Conc(asyncDoProc)
 #endif
+
+#include "network-fancy.h"
 
 type HostName = String
 
@@ -104,10 +96,10 @@ sendTo (SA sa salen) (Socket s) str = do
                                        (threadWaitWrite (fromIntegral s))
   when (r/=fromIntegral len) $ fail "sendTo: partial packet sent!"
 
-foreign import CALLCONV unsafe "recv" c_recv :: CInt -> Ptr Word8 -> CSize -> CInt -> IO (#type ssize_t)
-foreign import CALLCONV unsafe "send" c_send :: CInt -> Ptr Word8 -> CSize -> CInt -> IO (#type ssize_t)
-foreign import CALLCONV unsafe "recvfrom" c_recvfrom :: CInt -> Ptr Word8 -> CSize -> CInt -> Ptr () -> Ptr SLen -> IO (#type ssize_t)
-foreign import CALLCONV unsafe "sendto" c_sendto :: CInt -> Ptr Word8 -> CSize -> CInt -> Ptr () -> SLen -> IO (#type ssize_t)
+foreign import CALLCONV SAFE_ON_WIN "recv" c_recv :: CInt -> Ptr Word8 -> CSize -> CInt -> IO (#type ssize_t)
+foreign import CALLCONV SAFE_ON_WIN "send" c_send :: CInt -> Ptr Word8 -> CSize -> CInt -> IO (#type ssize_t)
+foreign import CALLCONV SAFE_ON_WIN "recvfrom" c_recvfrom :: CInt -> Ptr Word8 -> CSize -> CInt -> Ptr () -> Ptr SLen -> IO (#type ssize_t)
+foreign import CALLCONV SAFE_ON_WIN "sendto" c_sendto :: CInt -> Ptr Word8 -> CSize -> CInt -> Ptr () -> SLen -> IO (#type ssize_t)
 
 -- | Close the socket specified.
 closeSocket :: Socket -> IO ()
@@ -116,7 +108,7 @@ closeSocket (Socket fd) = throwErrnoIfMinus1_ "close" $ c_close fd
 foreign import CALLCONV unsafe "bind"    c_bind    :: CInt -> Ptr () -> (SLen) -> IO CInt
 foreign import CALLCONV unsafe "listen"  c_listen  :: CInt -> CInt -> IO CInt
 foreign import CALLCONV unsafe "socket"  c_socket  :: CFamily -> CType -> CInt -> IO CInt
-foreign import CALLCONV unsafe "connect" c_connect :: CInt -> Ptr () -> (SLen) -> IO CInt
+foreign import CALLCONV SAFE_ON_WIN "connect" c_connect :: CInt -> Ptr () -> (SLen) -> IO CInt
 #ifdef WINDOWS
 foreign import CALLCONV unsafe "closesocket" c_close :: CInt -> IO CInt
 #else
@@ -189,6 +181,7 @@ withResolverLock :: IO a -> IO a
 #ifdef WINDOWS
 withResolverLock c = resolverLock `seq` c
 {-# NOINLINE resolverLock #-}
+resolverLock :: CInt
 resolverLock = unsafePerformIO $ allocaBytes (#size struct WSAData) (wsaStartup 0x0002)
 foreign import stdcall safe "WSAStartup" wsaStartup :: Int -> Ptr a -> IO CInt
 #else
@@ -391,12 +384,28 @@ accept :: Socket -> SocketAddress -> IO (Socket, SocketAddress)
 accept (Socket lfd) (SA _ len) = do
   sa <- mallocForeignPtrBytes len
   s  <- withForeignPtr sa $ \sa_ptr -> do
+#ifndef WINDOWS
           with (fromIntegral len) $ \len_ptr -> do
             throwErrnoIfMinus1RetryMayBlock "accept" (c_accept lfd sa_ptr len_ptr) (threadWaitRead (fromIntegral lfd))
+#else
+  s  <-   if threaded then with (fromIntegral len) $ \len_ptr -> do
+                           throwErrnoIfMinus1 "accept" (c_accept lfd sa_ptr len_ptr)
+                      else allocaBytes (#sizeof struct network_fancy_aaccept) $ \ptr -> do
+                           (#poke struct network_fancy_aaccept, s)    ptr lfd
+                           (#poke struct network_fancy_aaccept, addr) ptr sa_ptr
+                           (#poke struct network_fancy_aaccept, alen) ptr len
+                           r <- asyncDoProc c_nf_async_accept ptr
+                           when (r /= 0) $ ioError (errnoToIOError "accept" (Errno (fromIntegral r)) Nothing Nothing)
+                           (#peek struct network_fancy_aaccept, s) ptr
+                           
+#endif
   setNonBlockingFD s
   return (Socket s,SA sa len)
 
-foreign import CALLCONV unsafe "accept"  c_accept  :: CInt -> Ptr () -> Ptr (SLen) -> IO CInt
+foreign import CALLCONV SAFE_ON_WIN "accept"  c_accept  :: CInt -> Ptr () -> Ptr (SLen) -> IO CInt
+#ifdef WINDOWS
+foreign import ccall unsafe "&c_nf_async_accept" c_nf_async_accept :: FunPtr (Ptr () -> IO Int)
+#endif
 
 -- | Run a datagram (udp) server. The function does not block, use sleepForever if that is desired.
 dgramServer  :: StringLike packet => ServerSpec -- ^ Server specification

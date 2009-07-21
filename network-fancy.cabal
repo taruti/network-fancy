@@ -16,28 +16,32 @@ Executable network-fancy-test
     Other-Modules:       Network.Fancy
     GHC-Options:         -fhpc
     C-Sources:           cbits.c
+    Includes:            network-fancy.h
+    Include-dirs:        .
     Build-depends:	 base == 4.*, bytestring, random, directory
     Extensions:          TypeSynonymInstances, ForeignFunctionInterface, CPP, 
                          DeriveDataTypeable, FlexibleInstances, RankNTypes
     if os(windows)
-      CPP-Options:       -DWINDOWS=WINDOWS -DCALLCONV=stdcall
-      CC-Options:        -DWINDOWS=WINDOWS -DCALLCONV=stdcall
+      CPP-Options:       -DWINDOWS=WINDOWS -DCALLCONV=stdcall -DSAFE_ON_WIN=safe
+      CC-Options:        -DWINDOWS=WINDOWS -DCALLCONV=stdcall -DSAFE_ON_WIN=safe
       Extra-Libraries:   ws2_32
     else
-      CPP-Options:       -DCALLCONV=ccall
-      CC-Options:        -DCALLCONV=ccall
+      CPP-Options:       -DCALLCONV=ccall -DSAFE_ON_WIN=unsafe
+      CC-Options:        -DCALLCONV=ccall -DSAFE_ON_WIN=unsafe
 
 Library
     Build-Depends:       base == 4.*, bytestring
     Exposed-modules:     Network.Fancy
     C-Sources:           cbits.c
+    Includes:            network-fancy.h
+    Include-dirs:        .
+    GHC-Options:         -Wall
     Extensions:          TypeSynonymInstances, ForeignFunctionInterface, CPP, 
                          DeriveDataTypeable, FlexibleInstances, RankNTypes
-    GHC-Options:         -Wall
     if os(windows)
-      CPP-Options:       -DWINDOWS=WINDOWS -DCALLCONV=stdcall
-      CC-Options:        -DWINDOWS=WINDOWS -DCALLCONV=stdcall
+      CPP-Options:       -DWINDOWS=WINDOWS -DCALLCONV=stdcall -DSAFE_ON_WIN=safe
+      CC-Options:        -DWINDOWS=WINDOWS -DCALLCONV=stdcall -DSAFE_ON_WIN=safe
       Extra-Libraries:   ws2_32
     else
-      CPP-Options:       -DCALLCONV=ccall
-      CC-Options:        -DCALLCONV=ccall
+      CPP-Options:       -DCALLCONV=ccall -DSAFE_ON_WIN=unsafe
+      CC-Options:        -DCALLCONV=ccall -DSAFE_ON_WIN=unsafe

@@ -1,15 +1,4 @@
-#ifndef WINDOWS
-#include <arpa/inet.h>
-#include <errno.h>
-#include <netdb.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-#else
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#define sa_family_t short
-#define AI_NUMERICSERV 0
-#endif
+#include "network-fancy.h"
 
 int getSocketError(void) { return errno; }
 
@@ -19,3 +8,13 @@ int getsockopt_error(int fd) {
   res = getsockopt(fd, SOL_SOCKET, SO_ERROR, &estat, &len);
   return (res == 0) ? estat : errno;
 }
+
+#ifdef WINDOWS
+
+int c_nf_async_accept(struct network_fancy_aaccept *nfa) {
+  SOCKET n = accept(nfa->s, nfa->addr, &nfa->alen);
+  nfa->s = n;
+  return (n != INVALID_SOCKET) ? 0 : GetLastError();
+}
+
+#endif
