@@ -166,7 +166,7 @@ getFamily (SA sa _) = worker >>= return . fromIntegral
     where worker :: IO #type sa_family_t
 	  worker = withForeignPtr sa (#peek struct sockaddr, sa_family) 
 
-csas :: forall a. (SocketAddress -> IO a) -> [SocketAddress] -> IO a
+csas :: (SocketAddress -> IO a) -> [SocketAddress] -> IO a
 csas _ []       = fail "No such host"
 csas c [sa]     = c sa
 csas c (sa:sas) = do x <- try' (c sa)
@@ -405,6 +405,7 @@ accept (Socket lfd) (SA _ len) = do
 foreign import CALLCONV SAFE_ON_WIN "accept"  c_accept  :: CInt -> Ptr () -> Ptr (SLen) -> IO CInt
 #ifdef WINDOWS
 foreign import ccall unsafe "&c_nf_async_accept" c_nf_async_accept :: FunPtr (Ptr () -> IO Int)
+foreign import ccall unsafe "rtsSupportsBoundThreads" threaded :: Bool
 #endif
 
 -- | Run a datagram (udp) server. The function does not block, use sleepForever if that is desired.

@@ -19,8 +19,7 @@ Executable network-fancy-test
     Includes:            network-fancy.h
     Include-dirs:        .
     Build-depends:	 base == 4.*, bytestring, random, directory
-    Extensions:          TypeSynonymInstances, ForeignFunctionInterface, CPP, 
-                         DeriveDataTypeable, FlexibleInstances, RankNTypes
+    Extensions:          TypeSynonymInstances, ForeignFunctionInterface, CPP, DeriveDataTypeable
     if os(windows)
       CPP-Options:       -DWINDOWS=WINDOWS -DCALLCONV=stdcall -DSAFE_ON_WIN=safe
       CC-Options:        -DWINDOWS=WINDOWS -DCALLCONV=stdcall -DSAFE_ON_WIN=safe
@@ -36,8 +35,7 @@ Library
     Includes:            network-fancy.h
     Include-dirs:        .
     GHC-Options:         -Wall
-    Extensions:          TypeSynonymInstances, ForeignFunctionInterface, CPP, 
-                         DeriveDataTypeable, FlexibleInstances, RankNTypes
+    Extensions:          TypeSynonymInstances, ForeignFunctionInterface, CPP, DeriveDataTypeable
     if os(windows)
       CPP-Options:       -DWINDOWS=WINDOWS -DCALLCONV=stdcall -DSAFE_ON_WIN=safe
       CC-Options:        -DWINDOWS=WINDOWS -DCALLCONV=stdcall -DSAFE_ON_WIN=safe

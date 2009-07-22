@@ -52,9 +52,9 @@ server_test adr = tryE $ do
   "GNIP" <- hGetLine h
   putStrLn "> ok"
 
-tryE :: forall a. IO a -> IO ()
+tryE :: IO a -> IO ()
 tryE x = try x >>= eh
-    where eh :: Either SomeException a -> IO ()
-          eh (Left e) = print e
-          eh _        = return ()
+eh :: Either SomeException a -> IO ()
+eh (Left e) = print e
+eh _        = return ()
 
