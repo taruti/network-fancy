@@ -5,7 +5,11 @@ int getSocketError(void) { return errno; }
 int getsockopt_error(int fd) {
   int estat, res;
   socklen_t len = sizeof(int);
+#ifdef WINDOWS
+  res = getsockopt(fd, SOL_SOCKET, SO_ERROR, (char*)&estat, &len);
+#else
   res = getsockopt(fd, SOL_SOCKET, SO_ERROR, &estat, &len);
+#endif
   return (res == 0) ? estat : errno;
 }
 

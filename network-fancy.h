@@ -19,7 +19,7 @@
 struct network_fancy_aaccept {
   SOCKET s;
   struct sockaddr *addr;
-  int *alen;
+  int alen;
 };
 #define SAFE_ON_WIN safe
 
