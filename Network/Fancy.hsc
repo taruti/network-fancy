@@ -388,7 +388,7 @@ accept (Socket lfd) (SA _ len) = do
           with (fromIntegral len) $ \len_ptr -> do
             throwErrnoIfMinus1RetryMayBlock "accept" (c_accept lfd sa_ptr len_ptr) (threadWaitRead (fromIntegral lfd))
 #else
-  s  <-   if threaded then with (fromIntegral len) $ \len_ptr -> do
+          if threaded then with (fromIntegral len) $ \len_ptr -> do
                            throwErrnoIfMinus1 "accept" (c_accept lfd sa_ptr len_ptr)
                       else allocaBytes (#size struct network_fancy_aaccept) $ \ptr -> do
                            (#poke struct network_fancy_aaccept, s)    ptr lfd
