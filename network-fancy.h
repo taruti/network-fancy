@@ -9,6 +9,10 @@
 #include <sys/un.h>
 #define SAFE_ON_WIN unsafe
 
+#ifndef AF_LOCAL
+#define AF_LOCAL AF_UNIX
+#endif
+
 #else /* WINDOWS */
 
 #include <winsock2.h>

@@ -20,13 +20,17 @@ Executable network-fancy-test
     Include-dirs:        .
     Build-depends:	 base == 4.*, bytestring, random, directory
     Extensions:          TypeSynonymInstances, ForeignFunctionInterface, CPP, DeriveDataTypeable
-    if os(windows)
+    if os(windows) {
       CPP-Options:       -DWINDOWS=WINDOWS -DCALLCONV=stdcall -DSAFE_ON_WIN=safe
       CC-Options:        -DWINDOWS=WINDOWS -DCALLCONV=stdcall -DSAFE_ON_WIN=safe
       Extra-Libraries:   ws2_32
-    else
+    } else {
+      if os(solaris) {
+        Extra-Libraries: socket
+      }
       CPP-Options:       -DCALLCONV=ccall -DSAFE_ON_WIN=unsafe
       CC-Options:        -DCALLCONV=ccall -DSAFE_ON_WIN=unsafe
+    }
 
 Library
     Build-Depends:       base == 4.*, bytestring
@@ -36,10 +40,14 @@ Library
     Include-dirs:        .
     GHC-Options:         -Wall
     Extensions:          TypeSynonymInstances, ForeignFunctionInterface, CPP, DeriveDataTypeable
-    if os(windows)
+    if os(windows) {
       CPP-Options:       -DWINDOWS=WINDOWS -DCALLCONV=stdcall -DSAFE_ON_WIN=safe
       CC-Options:        -DWINDOWS=WINDOWS -DCALLCONV=stdcall -DSAFE_ON_WIN=safe
       Extra-Libraries:   ws2_32
-    else
+    } else {
+      if os(solaris) {
+        Extra-Libraries: socket
+      }
       CPP-Options:       -DCALLCONV=ccall -DSAFE_ON_WIN=unsafe
       CC-Options:        -DCALLCONV=ccall -DSAFE_ON_WIN=unsafe
+    }
