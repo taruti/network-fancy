@@ -38,7 +38,7 @@ ipv4_test = server_test =<< (IPv4 "127.0.0.1" `fmap` rport)
 ipv6_test = server_test =<< (IPv6 "::1" `fmap` rport)
 
 unix_test = do
-  removeFile "/tmp/unix_test"
+  tryE $ removeFile "/tmp/unix_test"
   server_test $ Unix "/tmp/unix_test"
 
 server_test adr = tryE $ do
