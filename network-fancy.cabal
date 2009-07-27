@@ -14,7 +14,7 @@ Build-Type:          Simple
 Executable network-fancy-test
     Main-Is:             test.hs
     Other-Modules:       Network.Fancy
-    GHC-Options:         -fhpc -threaded
+    GHC-Options:         -threaded
     C-Sources:           cbits.c
     Includes:            network-fancy.h
     Include-dirs:        .
