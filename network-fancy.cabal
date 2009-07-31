@@ -1,5 +1,5 @@
 Name:                network-fancy
-Version:             0.1.1
+Version:             0.1.2
 Synopsis:            Networking support with a cleaner API
 Description:         Networking support with a cleaner API
 License:             BSD3
@@ -10,25 +10,6 @@ Category:            Network
 Maintainer:          taruti@taruti.net
 Build-Type:          Simple
 Cabal-version:       >= 1.6
-
-Executable network-fancy-test
-    Main-Is:             test.hs
-    Other-Modules:       Network.Fancy
-    GHC-Options:         -threaded
-    C-Sources:           cbits.c
-    Build-depends:	 base == 4.*, bytestring, random, directory
-    Extensions:          TypeSynonymInstances, ForeignFunctionInterface, CPP, DeriveDataTypeable
-    if os(windows) {
-      CPP-Options:       -DWINDOWS=WINDOWS -DCALLCONV=stdcall -DSAFE_ON_WIN=safe
-      CC-Options:        -DWINDOWS=WINDOWS -DCALLCONV=stdcall -DSAFE_ON_WIN=safe
-      Extra-Libraries:   ws2_32
-    } else {
-      if os(solaris) {
-        Extra-Libraries: socket
-      }
-      CPP-Options:       -DCALLCONV=ccall -DSAFE_ON_WIN=unsafe
-      CC-Options:        -DCALLCONV=ccall -DSAFE_ON_WIN=unsafe
-    }
 
 Library
     Build-Depends:       base == 4.*, bytestring
