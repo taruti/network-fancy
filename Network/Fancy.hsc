@@ -50,6 +50,10 @@ import GHC.Conc(asyncDoProc)
 #define AF_LOCAL AF_UNIX
 #endif
 
+#ifndef  AI_NUMERICSERV
+#define AI_NUMERICSERV 0
+#endif
+
 #else /* WINDOWS */
 
 #include <winsock2.h>
