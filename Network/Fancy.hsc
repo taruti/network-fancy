@@ -270,8 +270,9 @@ getAddrInfo host serv flags fam typ = withResolverLock $ do
   let unai :: Ptr AddrInfoT -> IO [SocketAddress]
       unai ai | ai == nullPtr = return []
               | otherwise     = uwork ai
-      uwork ai = do sal <- (#peek struct addrinfo, ai_addrlen)   ai
+      uwork ai = do sal'<- (#peek struct addrinfo, ai_addrlen)   ai :: IO SLen
                     sa' <- (#peek struct addrinfo, ai_addr)      ai
+                    let sal = fromIntegral sal'
                     sa  <- mallocForeignPtrBytes sal
                     copyBytes (unsafeForeignPtrToPtr sa) sa' sal
                     next<- (#peek struct addrinfo, ai_next)      ai
