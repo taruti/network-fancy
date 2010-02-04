@@ -29,9 +29,8 @@ import Numeric(showHex)
 import System.IO(Handle, hClose, IOMode(ReadWriteMode))
 import System.IO.Unsafe(unsafeInterleaveIO)
 import GHC.Handle(fdToHandle')
-#if __GLASGOW_HASKELL__ <= 610
 import System.Posix.Internals hiding(c_close)
-#else
+#if __GLASGOW_HASKELL__ > 610
 import GHC.IO.Device
 #endif
 #ifdef WINDOWS
@@ -69,6 +68,13 @@ struct network_fancy_aaccept {
 #define SAFE_ON_WIN safe
 
 #endif /* WINDOWS */
+
+setNonBlockingFD' =
+#if __GLASGOW_HASKELL__ < 611
+    System.Posix.Internals.setNonBlockingFD
+#else
+    flip System.Posix.Internals.setNonBlockingFD True
+#endif
 
 type HostName = String
 
@@ -175,7 +181,7 @@ connect :: CType -> SocketAddress -> IO Socket
 connect stype (SA sa len) = do
   fam <- getFamily (SA sa len)
   s   <- throwErrnoIfMinus1 "socket" $ c_socket fam stype 0
-  setNonBlockingFD s
+  setNonBlockingFD' s
   let loop = do r   <- withForeignPtr sa $ \ptr -> c_connect s ptr (fromIntegral len)
 	       	err <- getErrno
        	        case r of
@@ -381,7 +387,7 @@ streamServer ss sfun = do
   forM sas $ \sa -> do
      fam  <- getFamily sa
      sock <- throwErrnoIfMinus1 "socket" $ c_socket fam sockStream 0
-     setNonBlockingFD sock
+     setNonBlockingFD' sock
      let socket = Socket sock
      let on :: CInt
          on = 1
@@ -430,7 +436,7 @@ accept (Socket lfd) (SA _ len) = do
                            (#peek struct network_fancy_aaccept, s) ptr
                            
 #endif
-  setNonBlockingFD s
+  setNonBlockingFD' s
   return (Socket s,SA sa len)
 
 foreign import CALLCONV SAFE_ON_WIN "accept"  c_accept  :: CInt -> Ptr () -> Ptr (SLen) -> IO CInt
@@ -449,7 +455,7 @@ dgramServer ss sfun = do
   forM sas $ \sa -> do
      fam  <- getFamily sa
      sock <- throwErrnoIfMinus1 "socket" $ c_socket fam sockDgram 0
-     setNonBlockingFD sock
+     setNonBlockingFD' sock
      let socket = Socket sock
      let on :: CInt
          on = 1
