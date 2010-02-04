@@ -10,6 +10,10 @@ Category:            Network
 Maintainer:          taruti@taruti.net
 Build-Type:          Simple
 Cabal-version:       >= 1.6
+Homepage:	     http://github.com/taruti/network-fancy
+Source-repository head
+  type:     git
+  location: http://github.com/taruti/network-fancy
 
 Library
     Build-Depends:       base == 4.*, bytestring
