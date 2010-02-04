@@ -28,10 +28,12 @@ import Foreign.C
 import Numeric(showHex)
 import System.IO(Handle, hClose, IOMode(ReadWriteMode))
 import System.IO.Unsafe(unsafeInterleaveIO)
-import GHC.Handle(fdToHandle')
 import System.Posix.Internals hiding(c_close)
 #if __GLASGOW_HASKELL__ > 610
 import GHC.IO.Device
+import GHC.IO.Handle.FD(fdToHandle')
+#else
+import GHC.Handle(fdToHandle')
 #endif
 #ifdef WINDOWS
 import GHC.Conc(asyncDoProc)
@@ -69,6 +71,7 @@ struct network_fancy_aaccept {
 
 #endif /* WINDOWS */
 
+setNonBlockingFD' :: FD -> IO ()
 setNonBlockingFD' =
 #if __GLASGOW_HASKELL__ < 611
     System.Posix.Internals.setNonBlockingFD
@@ -286,7 +289,7 @@ getAddrInfo host serv flags fam typ = withResolverLock $ do
                     return ((SA sa sal):rest)
       getAI :: IO (Ptr AddrInfoT)
       getAI = allocaBytes (#size struct addrinfo) $ \hints -> do
-              B.memset hints 0 (#size struct addrinfo)
+              _ <- B.memset hints 0 (#size struct addrinfo)
               (#poke struct addrinfo, ai_flags)    hints flags
               (#poke struct addrinfo, ai_family)   hints fam
               (#poke struct addrinfo, ai_socktype) hints typ
@@ -392,7 +395,7 @@ streamServer ss sfun = do
      let on :: CInt
          on = 1
          os = fromIntegral $ sizeOf on
-     with on $ \onptr -> c_setsockopt sock (#const SOL_SOCKET) (#const SO_REUSEADDR) onptr os
+     _ <- with on $ \onptr -> c_setsockopt sock (#const SOL_SOCKET) (#const SO_REUSEADDR) onptr os
      bind socket sa
      listen socket 128
      let loop = do (s,psa) <- accept socket sa
@@ -460,7 +463,7 @@ dgramServer ss sfun = do
      let on :: CInt
          on = 1
          os = fromIntegral $ sizeOf on
-     with on $ \onptr -> c_setsockopt sock (#const SOL_SOCKET) (#const SO_REUSEADDR) onptr os
+     _ <- with on $ \onptr -> c_setsockopt sock (#const SOL_SOCKET) (#const SO_REUSEADDR) onptr os
      bind socket sa
      let loop = do (str,psa) <- recvFrom socket (recvSize ss) sa
                    a <- unsafeInterleaveIO $ case reverseAddress ss of
