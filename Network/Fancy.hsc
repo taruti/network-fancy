@@ -55,6 +55,10 @@ import GHC.Conc(asyncDoProc)
 #define AI_NUMERICSERV 0
 #endif
 
+#ifdef FREEBSD
+#include <netinet6/in6.h>
+#endif /* FREEBSD */
+
 #else /* WINDOWS */
 
 #include <winsock2.h>
