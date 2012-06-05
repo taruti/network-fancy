@@ -20,7 +20,7 @@ Library
     Exposed-modules:     Network.Fancy
     C-Sources:           cbits.c
     GHC-Options:         -Wall
-    Extensions:          TypeSynonymInstances, ForeignFunctionInterface, CPP, DeriveDataTypeable
+    Extensions:          TypeSynonymInstances, ForeignFunctionInterface, CPP, DeriveDataTypeable, FlexibleInstances
     if os(windows) {
       CPP-Options:       -DWINDOWS=WINDOWS -DCALLCONV=stdcall -DSAFE_ON_WIN=safe
       CC-Options:        -DWINDOWS=WINDOWS -DCALLCONV=stdcall -DSAFE_ON_WIN=safe
