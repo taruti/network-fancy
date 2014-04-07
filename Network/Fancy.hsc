@@ -23,7 +23,7 @@ import qualified Data.ByteString.Unsafe as B
 import qualified Data.ByteString.Lazy  as L
 import Data.List(intercalate)
 import Data.Typeable(Typeable)
-import Foreign
+import Foreign hiding (unsafeForeignPtrToPtr)
 import Foreign.C
 import Foreign.ForeignPtr.Unsafe (unsafeForeignPtrToPtr)
 import Numeric(showHex)
