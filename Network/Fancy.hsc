@@ -25,6 +25,7 @@ import Data.List(intercalate)
 import Data.Typeable(Typeable)
 import Foreign
 import Foreign.C
+import Foreign.ForeignPtr.Unsafe (unsafeForeignPtrToPtr)
 import Numeric(showHex)
 import System.IO(Handle, hClose, IOMode(ReadWriteMode))
 import System.IO.Unsafe(unsafeInterleaveIO)
