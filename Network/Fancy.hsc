@@ -23,7 +23,11 @@ import qualified Data.ByteString.Unsafe as B
 import qualified Data.ByteString.Lazy  as L
 import Data.List(intercalate)
 import Data.Typeable(Typeable)
+#if __GLASGOW_HASKELL__ >= 708
+import Foreign
+#else
 import Foreign hiding (unsafeForeignPtrToPtr)
+#endif
 import Foreign.C
 import Foreign.ForeignPtr.Unsafe (unsafeForeignPtrToPtr)
 import Numeric(showHex)
