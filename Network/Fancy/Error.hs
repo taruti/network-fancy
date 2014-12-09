@@ -32,7 +32,7 @@ import System.IO.Unsafe
 import Network.Fancy.Internal
 
 -- | Exceptions occuring in network-fancy.
-data NetworkException = NE !String Socket !Errno
+data NetworkException = NE !String !Socket !Errno
                       | NE_GAI !CInt
                       | NE_Other OtherNetworkError
                         deriving(Typeable)
