@@ -136,10 +136,12 @@ recvFrom :: StringLike string => Socket -> Int -> SocketAddress -> IO (string,So
 recvFrom (Socket s) buflen (SA _ salen) = do
   sa <- mallocForeignPtrBytes salen
   withForeignPtr sa $ \sa_ptr -> do
-  str<- B.createAndTrim buflen $ \ptr -> do
+  (str,len) <- B.createAndTrim' buflen $ \ptr -> do
     with (fromIntegral salen) $ \salen_ptr -> do
-    fmap fromIntegral $ readOp "recvfrom" s $ c_recvfrom s ptr (fromIntegral buflen) 0 sa_ptr salen_ptr
-  return (fromBS str, SA sa salen)
+    rd  <- readOp "recvfrom" s $ c_recvfrom s ptr (fromIntegral buflen) 0 sa_ptr salen_ptr
+    len <- peek salen_ptr
+    return (0,fromIntegral rd, fromIntegral len)
+  return (fromBS str, SA sa len)
 
 sendTo :: StringLike string => SocketAddress -> Socket -> string -> IO ()
 sendTo (SA sa salen) (Socket s) str = do
@@ -262,7 +264,10 @@ foreign import stdcall safe "WSAStartup" wsaStartup :: Int -> Ptr a -> IO CInt
 withResolverLock x = x
 #endif
 
-data SocketAddress = SA !(ForeignPtr ()) !Int deriving(Show)
+data SocketAddress = SA !(ForeignPtr ()) !Int
+
+instance Show SocketAddress where show _ = "SocketAddress"
+
 type AddrInfoT     = Word8
 
 type CFamily      = Int
@@ -514,7 +519,8 @@ rnumeric (SA sa len) = do
                           p <- ntohs =<< (#peek struct sockaddr_in6, sin6_port) sa_ptr
                           return $ IPv6 n (fromIntegral p)
 #ifndef WINDOWS
-      | f == afLocal-> do n <- peekCString $ (#ptr struct sockaddr_un, sun_path) sa_ptr
+      | f == afLocal-> do if len == 0 then return (Unix "") else do
+                          n <- peekCString $ (#ptr struct sockaddr_un, sun_path) sa_ptr
                           return $ Unix n
 #endif
       | otherwise   -> do throwOther UnsupportedAddressFamily

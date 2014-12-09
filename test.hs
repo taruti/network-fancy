@@ -45,7 +45,9 @@ unix_test = do
 
 server_test adr = tryE $ do
   put ("> running server_test "++show adr)
-  streamServer (serverSpec { address = adr }) (\h sa -> put ("< connect from "++show sa) >> hGetLine h >>= hPutStrLn h . reverse)
+  streamServer (serverSpec { address = adr }) $ \h ra -> do
+    put ("< connect from "++show ra)
+    hGetLine h >>= hPutStrLn h . reverse
   put "> starting client"
   withStream adr $ \h -> do
   put ("> client to "++show adr)
