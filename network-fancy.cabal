@@ -12,6 +12,7 @@ description: Networking support with a cleaner API
 category: Network
 author: Taru Karttunen
 data-dir: ""
+Extra-Source-Files: changelog.md
 
 source-repository head
     type: git
