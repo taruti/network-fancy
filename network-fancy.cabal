@@ -1,6 +1,6 @@
 name: network-fancy
 version: 0.2.0
-cabal-version: >=1.6
+cabal-version: >=1.8
 build-type: Simple
 license: BSD3
 license-file: COPYING
@@ -34,6 +34,8 @@ library
             exposed: True
             buildable: True
             extra-libraries: socket
+        if os(linux)
+            cpp-options: -DLINUX=LINUX
         exposed: True
         buildable: True
         cpp-options: -DCALLCONV=ccall -DSAFE_ON_WIN=unsafe
@@ -46,5 +48,3 @@ library
     extensions: TypeSynonymInstances ForeignFunctionInterface CPP
                 DeriveDataTypeable FlexibleInstances
     ghc-options: -Wall
-
-

@@ -64,13 +64,18 @@ throwNetworkException :: Socket -> String -> Errno -> IO any
 throwNetworkException sock desc err = throwIO $! SocketException desc sock err
 
 
+#ifdef LINUX
 strerror :: Errno -> String
 strerror (Errno val) = unsafePerformIO $
   allocaArray 512 $ \buffer -> do
     _ <- c_strerror_r val buffer 511
     peekCString buffer
 
-foreign import ccall unsafe "strerror_r" c_strerror_r :: CInt -> Ptr CChar -> CSize -> IO CInt
+foreign import ccall unsafe "__xpg_strerror_r" c_strerror_r :: CInt -> Ptr CChar -> CSize -> IO CInt
+#else
+strerror :: Errno -> String
+strerror = show
+#endif
 
 throwGAIErrorIf :: IO CInt -> IO ()
 throwGAIErrorIf comp = do
