@@ -12,7 +12,7 @@ module Network.Fancy
      -- * Other
      getCurrentHost,
      Socket,
-     NetworkException,
+     NetworkException(..),
     ) where
 
 import Control.Concurrent
