@@ -223,7 +223,7 @@ getFamily (SA sa _) = worker >>= return . fromIntegral
 	  worker = withForeignPtr sa (#peek struct sockaddr, sa_family)
 
 csas :: (SocketAddress -> IO a) -> [SocketAddress] -> IO a
-csas _ []       = throwOther NoSuchHost
+csas _ []       = throwOther NoSuchHostException
 csas c [sa]     = c sa
 csas c (sa:sas) = do x <- try' (c sa)
                      case x of
@@ -289,7 +289,7 @@ a2sas t f (IPv6 hn p)        = getAddrInfo hn (show p) f afInet6 t
 a2sas _ _ (Unix _)           = throwOther UnsupportedAddressFamily
 #else
 a2sas _ _ (Unix fp)          = do let maxSize = ((#size struct sockaddr_un)-(#offset struct sockaddr_un, sun_path))
-                                  when (length fp >= maxSize) $ throwOther AddressTooLong
+                                  when (length fp >= maxSize) $ throwOther AddressTooLongException
                                   sa <- mallocForeignPtrBytes $ fromIntegral salLocal
                                   withForeignPtr sa $ \sa_ptr -> do
                                   (#poke struct sockaddr_un, sun_family) sa_ptr afLocal
@@ -396,7 +396,7 @@ serverSpec = ServerSpec { address   = IP "" 0
 streamServer :: ServerSpec -> (Handle -> Address -> IO ()) -> IO [ThreadId]
 streamServer ss sfun = do
   sas <- a2sas sockStream (aiNumericserv .|. aiPassive) (address ss)
-  when (null sas) $ throwOther NoSuchHost
+  when (null sas) $ throwOther NoSuchHostException
   let sf ha psa = case threading ss of
                     Threaded -> forkIO (clo ha $ sfun ha psa) >> return ()
                     Inline   -> clo ha $ sfun ha psa
@@ -474,7 +474,7 @@ dgramServer  :: StringLike packet => ServerSpec -- ^ Server specification
                 -> IO [ThreadId] -- ^ ThreadIds of the server listener processes.
 dgramServer ss sfun = do
   sas <- a2sas sockDgram (aiNumericserv .|. aiPassive) (address ss)
-  when (null sas) $ throwOther NoSuchHost
+  when (null sas) $ throwOther NoSuchHostException
   forM sas $ \sa -> do
      fam  <- getFamily sa
      sock <- newsock fam sockDgram
@@ -523,7 +523,7 @@ rnumeric (SA sa len) = do
                           n <- peekCString $ (#ptr struct sockaddr_un, sun_path) sa_ptr
                           return $ Unix n
 #endif
-      | otherwise   -> do throwOther UnsupportedAddressFamily
+      | otherwise   -> do throwOther UnsupportedAddressFamilyException
 
 foreign import CALLCONV unsafe ntohs :: Word16 -> IO Word16
 
@@ -544,7 +544,7 @@ rname (SA sa len) = do
       | f == afLocal -> do n <- peekCString $ (#ptr struct sockaddr_un, sun_path) sa_ptr
                            return $ Unix n
 #endif
-      | otherwise    -> do throwOther UnsupportedAddressFamily
+      | otherwise    -> do throwOther UnsupportedAddressFamilyException
 
 
 type SLen = #type socklen_t
