@@ -17,7 +17,9 @@ module Network.Fancy.Error (
     throwGAIErrorIf,
     throwIfError,
     throwIfError_,
-    throwNetworkException
+    throwNetworkException,
+    throwOther,
+    OtherNetworkError(..),
 ) where
 
 import Control.Exception
@@ -32,6 +34,7 @@ import Network.Fancy.Internal
 -- | Exceptions occuring in network-fancy.
 data NetworkException = NE !String Socket !Errno
                       | NE_GAI !CInt
+                      | NE_Other OtherNetworkError
                         deriving(Typeable)
 
 instance Exception NetworkException
@@ -44,7 +47,19 @@ instance Eq NetworkException where
 instance Show NetworkException where
     show (NE s _ v) = s ++ ": " ++ strerror v
     show (NE_GAI v) = unsafePerformIO $ gaiError v
+    show (NE_Other v) = show v
 
+data OtherNetworkError = UnsupportedAddressFamily
+                       | NoSuchHost
+                       | AddressTooLong
+
+instance Show OtherNetworkError where
+  show UnsupportedAddressFamily = "Unsupported address family"
+  show NoSuchHost = "No such host"
+  show AddressTooLong = "Network address too long"
+
+throwOther :: OtherNetworkError -> IO any
+throwOther x = throwIO $! NE_Other x
 
 throwIfError_ :: Socket -> String -> IO CInt -> IO ()
 throwIfError_ sock desc act = throwIfError sock desc act >> return ()
