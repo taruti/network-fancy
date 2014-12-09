@@ -25,11 +25,12 @@ import Control.Monad
 import Data.Typeable
 import Foreign
 import Foreign.C
-import System.IO
 import System.IO.Unsafe
 
+import Network.Fancy.Internal
+
 -- | Exceptions occuring in network-fancy.
-data NetworkException = NE !String Handle !Errno
+data NetworkException = NE !String Socket !Errno
                       | NE_GAI !CInt
                         deriving(Typeable)
 
@@ -45,21 +46,18 @@ instance Show NetworkException where
     show (NE_GAI v) = unsafePerformIO $ gaiError v
 
 
-fixme = undefined
-
-throwIfError_ :: String -> IO CInt -> IO ()
-throwIfError_ desc act = throwIfError desc act >> return ()
+throwIfError_ :: Socket -> String -> IO CInt -> IO ()
+throwIfError_ sock desc act = throwIfError sock desc act >> return ()
 
 
-throwIfError :: String -> IO CInt -> IO CInt
-throwIfError desc act = do
+throwIfError :: Socket -> String -> IO CInt -> IO CInt
+throwIfError sock desc act = do
     res <- act
-    when (res == -1) (throwIO . NE desc fixme =<< getErrno)
+    when (res == -1) (throwIO . NE desc sock =<< getErrno)
     return res
 
-throwNetworkException :: String -> Errno -> IO any
-throwNetworkException desc err = throwIO $! NE desc fixme err
-
+throwNetworkException :: Socket -> String -> Errno -> IO any
+throwNetworkException sock desc err = throwIO $! NE desc sock err
 
 
 strerror :: Errno -> String

@@ -45,7 +45,9 @@ import GHC.Handle(fdToHandle')
 #ifdef WINDOWS
 import GHC.Conc(asyncDoProc)
 #endif
+
 import Network.Fancy.Error
+import Network.Fancy.Internal
 
 #ifndef WINDOWS
 #include <arpa/inet.h>
@@ -155,7 +157,7 @@ foreign import CALLCONV SAFE_ON_WIN "sendto" c_sendto :: CInt -> Ptr Word8 -> CS
 
 -- | Close the socket specified.
 closeSocket :: Socket -> IO ()
-closeSocket (Socket fd) = throwIfError_ "close" $ c_close fd
+closeSocket sock@(Socket fd) = throwIfError_ sock "close" $ c_close fd
 
 foreign import CALLCONV unsafe "bind"    c_bind    :: CInt -> Ptr () -> (SLen) -> IO CInt
 foreign import CALLCONV unsafe "listen"  c_listen  :: CInt -> CInt -> IO CInt
@@ -167,7 +169,6 @@ foreign import CALLCONV unsafe "closesocket" c_close :: CInt -> IO CInt
 foreign import CALLCONV unsafe "close" c_close :: CInt -> IO CInt
 #endif
 
-newtype Socket = Socket CInt
 
 -- | Open a datagram (udp) socket for the given block and close it afterwards.
 withDgram :: Address -> (Socket -> IO a) -> IO a
@@ -198,15 +199,16 @@ connect stype (SA sa len) = do
   fam <- getFamily (SA sa len)
   s   <- newsock fam stype
   setNonBlockingFD' s
+  let sock = Socket s
   let loop = do r   <- withForeignPtr sa $ \ptr -> c_connect s ptr (fromIntegral len)
 	       	err <- getErrno
        	        case r of
                   -1 | err == eINTR       -> do loop
 		     | err == eINPROGRESS -> do threadWaitWrite (fromIntegral s)
                                                 soe <- getsockopt_error s
-                                                if soe==0 then return (Socket s) else throwNetworkException "connect" (Errno soe)
-                     |  otherwise         -> do throwNetworkException "connect" err
-                  _                       -> do return $ Socket s
+                                                if soe==0 then return sock else throwNetworkException sock "connect" (Errno soe)
+                     |  otherwise         -> do throwNetworkException sock "connect" err
+                  _                       -> do return sock
   loop
 
 foreign import ccall unsafe getsockopt_error :: CInt -> IO CInt
@@ -236,7 +238,7 @@ writeOp desc s op = loop
                     if res /= -1 then return res else getErrno >>= eh
           eh err | err == eINTR = loop
                  | err == eWOULDBLOCK || err == eAGAIN = threadWaitWrite fd >> loop
-                 | True = throwNetworkException desc err
+                 | True = throwNetworkException (Socket s) desc err
 
 readOp :: String -> CInt -> IO Int64 -> IO Int64
 readOp desc s op = loop
@@ -245,7 +247,7 @@ readOp desc s op = loop
                     if res /= -1 then return res else getErrno >>= eh
           eh err | err == eINTR = loop
                  | err == eWOULDBLOCK || err == eAGAIN = threadWaitRead fd >> loop
-                 | True = throwNetworkException desc err
+                 | True = throwNetworkException (Socket s) desc err
 
 
 
@@ -353,10 +355,13 @@ foreign import CALLCONV   safe "getaddrinfo"  c_getaddrinfo  :: Ptr CChar -> Ptr
 getCurrentHost :: IO HostName
 getCurrentHost = do
   allocaArray 256 $ \buffer -> do
-    throwIfError_ "gethostname" $ c_gethostname buffer 256
+    throwIfError_ invSock "gethostname" $ c_gethostname buffer 256
     peekCString buffer
 
 foreign import CALLCONV unsafe "gethostname" c_gethostname :: Ptr CChar -> CSize -> IO CInt
+
+invSock :: Socket
+invSock = Socket (-1)
 
 -- SERVERS
 
@@ -414,20 +419,20 @@ streamServer ss sfun = do
      forkIO loop
 
 newsock :: CFamily -> CType -> IO CInt
-newsock fam typ = throwIfError "socket" $ c_socket fam typ 0
+newsock fam typ = throwIfError invSock "socket" $ c_socket fam typ 0
 
 foreign import CALLCONV unsafe "setsockopt" c_setsockopt ::
   CInt -> CInt -> CInt -> Ptr a -> CInt -> IO CInt
 
 -- | Bind a socket to an address. Be wary of AF_LOCAL + NFS blocking?
 bind :: Socket -> SocketAddress -> IO ()
-bind (Socket sock) (SA sa len) = do
+bind s@(Socket fd) (SA sa len) = do
   withForeignPtr sa $ \sa_ptr ->
-    throwIfError_ "bind" $ c_bind sock sa_ptr (fromIntegral len)
+    throwIfError_ s "bind" $ c_bind fd sa_ptr (fromIntegral len)
 
 -- | Listen on an socket
 listen :: Socket -> Int -> IO ()
-listen (Socket s) iv = throwIfError_ "listen" (c_listen s (toEnum iv))
+listen s@(Socket fd) iv = throwIfError_ s "listen" (c_listen fd (toEnum iv))
 
 accept :: Socket -> SocketAddress -> IO (Socket, SocketAddress)
 accept (Socket lfd) (SA _ len) = do
@@ -438,7 +443,7 @@ accept (Socket lfd) (SA _ len) = do
             readOp "accept" lfd $ fmap fromIntegral $ c_accept lfd sa_ptr len_ptr
 #else
           if threaded then with (fromIntegral len) $ \len_ptr -> do
-                           throwErrnoIfMinus1 "accept" (c_accept lfd sa_ptr len_ptr)
+                           throwIfError (Socket lfd) "accept" (c_accept lfd sa_ptr len_ptr)
                       else allocaBytes (#size struct network_fancy_aaccept) $ \ptr -> do
                            (#poke struct network_fancy_aaccept, s)    ptr lfd
                            (#poke struct network_fancy_aaccept, addr) ptr sa_ptr

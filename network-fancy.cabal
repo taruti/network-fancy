@@ -38,7 +38,7 @@ library
         cpp-options: -DCALLCONV=ccall -DSAFE_ON_WIN=unsafe
         cc-options: -DCALLCONV=ccall -DSAFE_ON_WIN=unsafe
     exposed-modules: Network.Fancy
-    other-modules: Network.Fancy.Error
+    other-modules: Network.Fancy.Error Network.Fancy.Internal
     exposed: True
     buildable: True
     c-sources: cbits.c
