@@ -26,7 +26,7 @@ struct network_fancy_aaccept {
 
 
 #endif
-int getSocketError(void) { return errno; }
+//int getSocketError(void) { return errno; }
 
 int getsockopt_error(int fd) {
   int estat, res;

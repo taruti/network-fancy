@@ -6,12 +6,13 @@ module Network.Fancy
      -- * Datagram clients
      connectDgram, withDgram, StringLike, recv,send, closeSocket,
      -- * Servers
-     ServerSpec(..), serverSpec, 
+     ServerSpec(..), serverSpec,
      Threading(..), Reverse(..),
      streamServer, dgramServer, sleepForever,
      -- * Other
      getCurrentHost,
-     Socket
+     Socket,
+     NetworkException,
     ) where
 
 import Control.Concurrent
@@ -28,7 +29,8 @@ import Foreign
 #else
 import Foreign hiding (unsafeForeignPtrToPtr)
 #endif
-import Foreign.C
+import Foreign.C(CString,peekCString,withCString,eAGAIN,eINTR,eWOULDBLOCK,getErrno,eINPROGRESS)
+import Foreign.C.Types
 import Foreign.ForeignPtr.Unsafe (unsafeForeignPtrToPtr)
 import Numeric(showHex)
 import System.IO(Handle, hClose, IOMode(ReadWriteMode))
@@ -43,6 +45,7 @@ import GHC.Handle(fdToHandle')
 #ifdef WINDOWS
 import GHC.Conc(asyncDoProc)
 #endif
+import Network.Fancy.Error
 
 #ifndef WINDOWS
 #include <arpa/inet.h>
@@ -81,11 +84,11 @@ struct network_fancy_aaccept {
 #endif /* WINDOWS */
 
 setNonBlockingFD' :: FD -> IO ()
-setNonBlockingFD' =
+setNonBlockingFD' fd =
 #if __GLASGOW_HASKELL__ < 611
-    System.Posix.Internals.setNonBlockingFD
+    System.Posix.Internals.setNonBlockingFD fd
 #else
-    flip System.Posix.Internals.setNonBlockingFD True
+    System.Posix.Internals.setNonBlockingFD fd True
 #endif
 
 type HostName = String
@@ -115,13 +118,13 @@ instance StringLike B.ByteString where
 -- | Send the string as one chunk
 send :: StringLike string => Socket -> string -> IO ()
 send (Socket s) bs = B.unsafeUseAsCStringLen (toBS bs) $ \(ptr,len) -> do
-                     r <- throwErrnoIfMinus1RetryMayBlock "send" (c_send s (castPtr ptr) (fromIntegral len) 0) (threadWaitWrite (fromIntegral s))
+                     r <- writeOp "send" s (c_send s (castPtr ptr) (fromIntegral len) 0)
                      when (r/=fromIntegral len) $ fail "send: partial packet sent!"
 -- | Receive one chunk with given maximum size
 recv :: StringLike string => Socket -> Int -> IO string
 recv (Socket s) len= fmap fromBS (
                      B.createAndTrim len $ \ptr -> do
-                     r <- throwErrnoIfMinus1RetryMayBlock "recv" (c_recv s (castPtr ptr) (fromIntegral len) 0) (threadWaitRead (fromIntegral s))
+                     r <- readOp "recv" s (c_recv s (castPtr ptr) (fromIntegral len) 0)
                      return $ fromIntegral r)
 
 recvFrom :: StringLike string => Socket -> Int -> SocketAddress -> IO (string,SocketAddress)
@@ -130,18 +133,14 @@ recvFrom (Socket s) buflen (SA _ salen) = do
   withForeignPtr sa $ \sa_ptr -> do
   str<- B.createAndTrim buflen $ \ptr -> do
     with (fromIntegral salen) $ \salen_ptr -> do
-    fmap fromIntegral $ throwErrnoIfMinus1RetryMayBlock "recvfrom"
-                                                        (c_recvfrom s ptr (fromIntegral buflen) 0 sa_ptr salen_ptr)
-                                                        (threadWaitRead (fromIntegral s))
+    fmap fromIntegral $ readOp "recvfrom" s $ c_recvfrom s ptr (fromIntegral buflen) 0 sa_ptr salen_ptr
   return (fromBS str, SA sa salen)
 
 sendTo :: StringLike string => SocketAddress -> Socket -> string -> IO ()
 sendTo (SA sa salen) (Socket s) str = do
   withForeignPtr sa $ \sa_ptr -> do
   B.unsafeUseAsCStringLen (toBS str) $ \(ptr,len) -> do
-  r <- throwErrnoIfMinus1RetryMayBlock "sendTo" 
-                                       (c_sendto s (castPtr ptr) (fromIntegral len) 0 sa_ptr (fromIntegral salen))
-                                       (threadWaitWrite (fromIntegral s))
+  r <- writeOp "sendTo" s $ c_sendto s (castPtr ptr) (fromIntegral len) 0 sa_ptr (fromIntegral salen)
   when (r/=fromIntegral len) $ fail "sendTo: partial packet sent!"
 
 foreign import CALLCONV SAFE_ON_WIN "recv" c_recv :: CInt -> Ptr Word8 -> CSize -> CInt -> IO (#type ssize_t)
@@ -151,7 +150,7 @@ foreign import CALLCONV SAFE_ON_WIN "sendto" c_sendto :: CInt -> Ptr Word8 -> CS
 
 -- | Close the socket specified.
 closeSocket :: Socket -> IO ()
-closeSocket (Socket fd) = throwErrnoIfMinus1_ "close" $ c_close fd
+closeSocket (Socket fd) = throwIfError_ "close" $ c_close fd
 
 foreign import CALLCONV unsafe "bind"    c_bind    :: CInt -> Ptr () -> (SLen) -> IO CInt
 foreign import CALLCONV unsafe "listen"  c_listen  :: CInt -> CInt -> IO CInt
@@ -192,7 +191,7 @@ socketToHandle (Socket fd) = fdToHandle' (fromIntegral fd) (Just GHC.IO.Device.S
 connect :: CType -> SocketAddress -> IO Socket
 connect stype (SA sa len) = do
   fam <- getFamily (SA sa len)
-  s   <- throwErrnoIfMinus1 "socket" $ c_socket fam stype 0
+  s   <- newsock fam stype
   setNonBlockingFD' s
   let loop = do r   <- withForeignPtr sa $ \ptr -> c_connect s ptr (fromIntegral len)
 	       	err <- getErrno
@@ -212,7 +211,7 @@ foreign import ccall unsafe getsockopt_error :: CInt -> IO CInt
 getFamily :: SocketAddress -> IO CFamily
 getFamily (SA sa _) = worker >>= return . fromIntegral
     where worker :: IO #type sa_family_t
-	  worker = withForeignPtr sa (#peek struct sockaddr, sa_family) 
+	  worker = withForeignPtr sa (#peek struct sockaddr, sa_family)
 
 csas :: (SocketAddress -> IO a) -> [SocketAddress] -> IO a
 csas _ []       = fail "No such host"
@@ -224,6 +223,26 @@ csas c (sa:sas) = do x <- try' (c sa)
 
 try' :: IO a -> IO (Either SomeException a)
 try' = E.try
+
+writeOp :: String -> CInt -> IO Int64 -> IO Int64
+writeOp desc s op = loop
+    where fd = fromIntegral s
+          loop = do res <- op
+                    if res /= -1 then return res else getErrno >>= eh
+          eh err | err == eINTR = loop
+                 | err == eWOULDBLOCK || err == eAGAIN = threadWaitWrite fd >> loop
+                 | True = throwNetworkException desc err
+
+readOp :: String -> CInt -> IO Int64 -> IO Int64
+readOp desc s op = loop
+    where fd = fromIntegral s
+          loop = do res <- op
+                    if res /= -1 then return res else getErrno >>= eh
+          eh err | err == eINTR = loop
+                 | err == eWOULDBLOCK || err == eAGAIN = threadWaitRead fd >> loop
+                 | True = throwNetworkException desc err
+
+
 
 withResolverLock :: IO a -> IO a
 #ifdef WINDOWS
@@ -267,7 +286,7 @@ a2sas _ _ (Unix fp)          = do let maxSize = ((#size struct sockaddr_un)-(#of
                                   pokeArray0 0 ((#ptr struct sockaddr_un, sun_path) sa_ptr) $ map tw fp
                                   return [SA sa salLocal]
 salLocal :: Int
-salLocal   =  #size struct sockaddr_un 
+salLocal   =  #size struct sockaddr_un
 
 #endif
 
@@ -313,38 +332,11 @@ getAddrInfo host serv flags fam typ = withResolverLock $ do
   bracket getAI c_freeaddrinfo unai
 
 foreign import CALLCONV unsafe "freeaddrinfo" c_freeaddrinfo :: Ptr AddrInfoT -> IO ()
-foreign import CALLCONV   safe "getaddrinfo"  c_getaddrinfo  :: Ptr CChar -> Ptr CChar -> 
+foreign import CALLCONV   safe "getaddrinfo"  c_getaddrinfo  :: Ptr CChar -> Ptr CChar ->
 							     Ptr AddrInfoT -> Ptr (Ptr AddrInfoT) ->
 							     IO CInt
 
 
-throwGAIErrorIf :: IO CInt -> IO ()
-throwGAIErrorIf comp = do 
-  err <- comp
-  when (err /= 0) (gaiError err >>= fail)
-
--- Don't use gai_strerror with winsock - it is not thread-safe there.
-gaiError :: CInt -> IO String
-#ifdef WINDOWS
-
-gaiError (#const EAI_AGAIN)    = return "Temporary failure in name resolution."
-gaiError (#const EAI_BADFLAGS) = return "Invalid value for ai_flags."
-gaiError (#const EAI_FAIL)     = return "Nonrecoverable failure in name resolution."
-gaiError (#const EAI_FAMILY)   = return "The ai_family member is not supported."
-gaiError (#const EAI_MEMORY)   = return "Memory allocation failure."
-gaiError (#const EAI_NODATA)   = return "No address associated with nodename."
-gaiError (#const EAI_NONAME)   = return "Neither nodename nor servname provided, or not known."
-gaiError (#const EAI_SERVICE)  = return "The servname parameter is not supported for ai_socktype."
-gaiError (#const EAI_SOCKTYPE) = return "The ai_socktype member is not supported."
-gaiError x                     = return ("Unknown gai_error value "++show x)
-
-#else
-
-gaiError err = c_gai_strerror err >>= peekCString
-
-foreign import CALLCONV unsafe "gai_strerror" c_gai_strerror :: CInt -> IO (Ptr CChar)
-
-#endif
 
 
 --hostNameToNumber :: Address -> IO [Address]
@@ -356,7 +348,7 @@ foreign import CALLCONV unsafe "gai_strerror" c_gai_strerror :: CInt -> IO (Ptr 
 getCurrentHost :: IO HostName
 getCurrentHost = do
   allocaArray 256 $ \buffer -> do
-    throwErrnoIfMinus1_ "gethostname" $ c_gethostname buffer 256
+    throwIfError_ "gethostname" $ c_gethostname buffer 256
     peekCString buffer
 
 foreign import CALLCONV unsafe "gethostname" c_gethostname :: Ptr CChar -> CSize -> IO CInt
@@ -398,7 +390,7 @@ streamServer ss sfun = do
                 False -> id
   forM sas $ \sa -> do
      fam  <- getFamily sa
-     sock <- throwErrnoIfMinus1 "socket" $ c_socket fam sockStream 0
+     sock <- newsock fam sockStream
      setNonBlockingFD' sock
      let socket = Socket sock
      let on :: CInt
@@ -416,18 +408,21 @@ streamServer ss sfun = do
                    loop
      forkIO loop
 
+newsock :: CFamily -> CType -> IO CInt
+newsock fam typ = throwIfError "socket" $ c_socket fam typ 0
+
 foreign import CALLCONV unsafe "setsockopt" c_setsockopt ::
   CInt -> CInt -> CInt -> Ptr a -> CInt -> IO CInt
 
 -- | Bind a socket to an address. Be wary of AF_LOCAL + NFS blocking?
 bind :: Socket -> SocketAddress -> IO ()
 bind (Socket sock) (SA sa len) = do
-  withForeignPtr sa $ \sa_ptr -> 
-    throwErrnoIfMinus1_ "bind" $ c_bind sock sa_ptr (fromIntegral len)
+  withForeignPtr sa $ \sa_ptr ->
+    throwIfError_ "bind" $ c_bind sock sa_ptr (fromIntegral len)
 
 -- | Listen on an socket
 listen :: Socket -> Int -> IO ()
-listen (Socket s) iv = throwErrnoIfMinus1_ "listen" (c_listen s (toEnum iv))
+listen (Socket s) iv = throwIfError_ "listen" (c_listen s (toEnum iv))
 
 accept :: Socket -> SocketAddress -> IO (Socket, SocketAddress)
 accept (Socket lfd) (SA _ len) = do
@@ -435,7 +430,7 @@ accept (Socket lfd) (SA _ len) = do
   s  <- withForeignPtr sa $ \sa_ptr -> do
 #ifndef WINDOWS
           with (fromIntegral len) $ \len_ptr -> do
-            throwErrnoIfMinus1RetryMayBlock "accept" (c_accept lfd sa_ptr len_ptr) (threadWaitRead (fromIntegral lfd))
+            readOp "accept" lfd $ fmap fromIntegral $ c_accept lfd sa_ptr len_ptr
 #else
           if threaded then with (fromIntegral len) $ \len_ptr -> do
                            throwErrnoIfMinus1 "accept" (c_accept lfd sa_ptr len_ptr)
@@ -446,10 +441,11 @@ accept (Socket lfd) (SA _ len) = do
                            r <- asyncDoProc c_nf_async_accept ptr
                            when (r /= 0) $ ioError (errnoToIOError "accept" (Errno (fromIntegral r)) Nothing Nothing)
                            (#peek struct network_fancy_aaccept, s) ptr
-                           
+
 #endif
-  setNonBlockingFD' s
-  return (Socket s,SA sa len)
+  let s' = fromIntegral s
+  setNonBlockingFD' s'
+  return (Socket s',SA sa len)
 
 foreign import CALLCONV SAFE_ON_WIN "accept"  c_accept  :: CInt -> Ptr () -> Ptr (SLen) -> IO CInt
 #ifdef WINDOWS
@@ -466,7 +462,7 @@ dgramServer ss sfun = do
   when (null sas) $ fail "No address for server!"
   forM sas $ \sa -> do
      fam  <- getFamily sa
-     sock <- throwErrnoIfMinus1 "socket" $ c_socket fam sockDgram 0
+     sock <- newsock fam sockDgram
      setNonBlockingFD' sock
      let socket = Socket sock
      let on :: CInt
