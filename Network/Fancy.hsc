@@ -29,7 +29,7 @@ import Foreign
 #else
 import Foreign hiding (unsafeForeignPtrToPtr)
 #endif
-import Foreign.C(CString,peekCString,withCString,eAGAIN,eINTR,eWOULDBLOCK,getErrno,eINPROGRESS)
+import Foreign.C(CString,peekCString,withCString,Errno(..),eAGAIN,eINTR,eWOULDBLOCK,getErrno,eINPROGRESS)
 import Foreign.C.Types
 import Foreign.ForeignPtr.Unsafe (unsafeForeignPtrToPtr)
 import Numeric(showHex)
@@ -117,9 +117,12 @@ instance StringLike B.ByteString where
 
 -- | Send the string as one chunk
 send :: StringLike string => Socket -> string -> IO ()
-send (Socket s) bs = B.unsafeUseAsCStringLen (toBS bs) $ \(ptr,len) -> do
-                     r <- writeOp "send" s (c_send s (castPtr ptr) (fromIntegral len) 0)
-                     when (r/=fromIntegral len) $ fail "send: partial packet sent!"
+send (Socket s) bs =
+  let loop ptr len = do
+        r <- writeOp "send" s (c_send s (castPtr ptr) (fromIntegral len) 0)
+        let r' = fromIntegral r
+        if r' >= len then return () else loop (plusPtr ptr r') (r' - len)
+  in B.unsafeUseAsCStringLen (toBS bs) $ \(ptr,len) -> loop ptr len
 -- | Receive one chunk with given maximum size
 recv :: StringLike string => Socket -> Int -> IO string
 recv (Socket s) len= fmap fromBS (
@@ -139,9 +142,11 @@ recvFrom (Socket s) buflen (SA _ salen) = do
 sendTo :: StringLike string => SocketAddress -> Socket -> string -> IO ()
 sendTo (SA sa salen) (Socket s) str = do
   withForeignPtr sa $ \sa_ptr -> do
-  B.unsafeUseAsCStringLen (toBS str) $ \(ptr,len) -> do
-  r <- writeOp "sendTo" s $ c_sendto s (castPtr ptr) (fromIntegral len) 0 sa_ptr (fromIntegral salen)
-  when (r/=fromIntegral len) $ fail "sendTo: partial packet sent!"
+  let loop ptr len = do
+        r <- writeOp "sendTo" s $ c_sendto s (castPtr ptr) (fromIntegral len) 0 sa_ptr (fromIntegral salen)
+        let r' = fromIntegral r
+        if r' >= len then return () else loop (plusPtr ptr r') (r' - len)
+  B.unsafeUseAsCStringLen (toBS str) $ \(ptr,len) -> loop ptr len
 
 foreign import CALLCONV SAFE_ON_WIN "recv" c_recv :: CInt -> Ptr Word8 -> CSize -> CInt -> IO (#type ssize_t)
 foreign import CALLCONV SAFE_ON_WIN "send" c_send :: CInt -> Ptr Word8 -> CSize -> CInt -> IO (#type ssize_t)
@@ -199,8 +204,8 @@ connect stype (SA sa len) = do
                   -1 | err == eINTR       -> do loop
 		     | err == eINPROGRESS -> do threadWaitWrite (fromIntegral s)
                                                 soe <- getsockopt_error s
-                                                if soe==0 then return (Socket s) else fail "connect"
-                     |  otherwise         -> do fail "connect"
+                                                if soe==0 then return (Socket s) else throwNetworkException "connect" (Errno soe)
+                     |  otherwise         -> do throwNetworkException "connect" err
                   _                       -> do return $ Socket s
   loop
 
