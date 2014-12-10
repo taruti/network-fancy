@@ -36,6 +36,7 @@ library
             extra-libraries: socket
         if os(linux)
             cpp-options: -DLINUX=LINUX
+            extra-libraries: pthread
         exposed: True
         buildable: True
         cpp-options: -DCALLCONV=ccall -DSAFE_ON_WIN=unsafe
