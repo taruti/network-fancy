@@ -31,6 +31,7 @@ struct network_fancy_aaccept {
 int getsockopt_error(int fd) {
   int estat, res;
   socklen_t len = sizeof(int);
+  estat = 0;
 #ifdef WINDOWS
   res = getsockopt(fd, SOL_SOCKET, SO_ERROR, (char*)&estat, &len);
 #else
