@@ -41,8 +41,8 @@ data NetworkException = SocketException !String !Socket !Errno
 instance Exception NetworkException
 
 instance Show NetworkException where
-    show (SocketException s _ v) = s ++ ": " ++ strerror v
-    show (GetAdddrInfoException v) = unsafePerformIO $ gaiError v
+    show (SocketException s (Socket fd) v) = s ++ " (" ++ show fd ++  "): " ++ strerror v
+    show (GetAdddrInfoException v) = "getaddrinfo: " ++ unsafePerformIO (gaiError v)
     show UnsupportedAddressFamilyException = "Unsupported address family"
     show NoSuchHostException = "No such host"
     show AddressTooLongException = "Network address too long"
