@@ -34,7 +34,7 @@ import Foreign.C.Types
 import Foreign.ForeignPtr.Unsafe (unsafeForeignPtrToPtr)
 import Numeric(showHex)
 import System.IO(Handle, hClose, IOMode(ReadWriteMode))
-import System.IO.Unsafe(unsafeInterleaveIO)
+import System.IO.Unsafe
 import System.Posix.Internals hiding(c_close)
 #if __GLASGOW_HASKELL__ > 610
 import GHC.IO.Device
