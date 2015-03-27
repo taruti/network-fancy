@@ -34,8 +34,9 @@ library
             exposed: True
             buildable: True
             extra-libraries: socket
+        if os(linux) || os(darwin)
+            cpp-options: -DHAVE_STRERROR_R=1
         if os(linux)
-            cpp-options: -DLINUX=LINUX
             extra-libraries: pthread
         exposed: True
         buildable: True
