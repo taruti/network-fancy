@@ -64,7 +64,7 @@ throwNetworkException :: Socket -> String -> Errno -> IO any
 throwNetworkException sock desc err = throwIO $! SocketException desc sock err
 
 
-#ifdef LINUX
+#ifdef HAVE_STRERROR_R
 strerror :: Errno -> String
 strerror (Errno val) = unsafePerformIO $
   allocaArray 512 $ \buffer -> do
