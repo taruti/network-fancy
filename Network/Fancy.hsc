@@ -203,10 +203,10 @@ connect stype (SA sa len) = do
   setNonBlockingFD' s
   let sock = Socket s
   let loop = do r   <- withForeignPtr sa $ \ptr -> c_connect s ptr (fromIntegral len)
-	       	err <- getErrno
-       	        case r of
+                err <- getErrno
+                case r of
                   -1 | err == eINTR       -> do loop
-		     | err == eINPROGRESS -> do threadWaitWrite (fromIntegral s)
+                     | err == eINPROGRESS -> do threadWaitWrite (fromIntegral s)
                                                 soe <- getsockopt_error s
                                                 if soe==0 then return sock else throwNetworkException sock "connect" (Errno soe)
                      |  otherwise         -> do throwNetworkException sock "connect" err
@@ -220,7 +220,7 @@ foreign import ccall unsafe getsockopt_error :: CInt -> IO CInt
 getFamily :: SocketAddress -> IO CFamily
 getFamily (SA sa _) = worker >>= return . fromIntegral
     where worker :: IO #type sa_family_t
-	  worker = withForeignPtr sa (#peek struct sockaddr, sa_family)
+          worker = withForeignPtr sa (#peek struct sockaddr, sa_family)
 
 csas :: (SocketAddress -> IO a) -> [SocketAddress] -> IO a
 csas _ []       = throwOther NoSuchHostException
@@ -345,8 +345,8 @@ getAddrInfo host serv flags fam typ = withResolverLock $ do
 
 foreign import CALLCONV unsafe "freeaddrinfo" c_freeaddrinfo :: Ptr AddrInfoT -> IO ()
 foreign import CALLCONV   safe "getaddrinfo"  c_getaddrinfo  :: Ptr CChar -> Ptr CChar ->
-							     Ptr AddrInfoT -> Ptr (Ptr AddrInfoT) ->
-							     IO CInt
+                                                                Ptr AddrInfoT -> Ptr (Ptr AddrInfoT) ->
+                                                                IO CInt
 
 
 
