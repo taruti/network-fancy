@@ -24,9 +24,9 @@ module Network.Fancy.Error (
 import Control.Exception
 import Control.Monad
 import Data.Typeable
-import Foreign
+import Foreign(allocaArray, Ptr)
 import Foreign.C
-import System.IO.Unsafe
+import System.IO.Unsafe(unsafePerformIO)
 
 import Network.Fancy.Internal
 
