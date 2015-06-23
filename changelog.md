@@ -1,5 +1,10 @@
 # network-fancy changelog
 
+## Master - not yet released to hackage
+
+- Fixes for ancient GHC, 32 bit platform woes, fix #8
+- Fixes for ancient GHC, make imports stricter, fix #7
+
 ## Version 0.2.3 2015-06-20
 
 - Fix OS X build
