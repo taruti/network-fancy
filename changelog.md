@@ -2,6 +2,8 @@
 
 ## Master - not yet released to hackage
 
+## Version 0.2.4 2016-03-02
+
 - Fixes for ancient GHC, 32 bit platform woes, fix #8
 - Fixes for ancient GHC, make imports stricter, fix #7
 
